@@ -1,0 +1,7 @@
+{
+  "name": "payetesheures-admin-migration",
+  "private": true,
+  "type": "module",
+  "scripts": { "migrate:check": "node scripts/migrate-team-ids.mjs", "migrate:apply": "node scripts/migrate-team-ids.mjs --apply" },
+  "dependencies": { "firebase-admin": "^13.5.0" }
+}

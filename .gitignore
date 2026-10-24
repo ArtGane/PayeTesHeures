@@ -1,0 +1,57 @@
+# Android Studio / Gradle
+.gradle/
+.idea/
+**/build/
+local.properties
+*.iml
+.cxx/
+.externalNativeBuild/
+
+# APK et clés de signature
+*.apk
+*.aab
+*.apks
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.asc
+keystore.properties
+key.properties
+signing.properties
+
+# Firebase : environnements réels, Admin SDK et données privées
+**/google-services.json
+**/google-services*.json
+**/GoogleService-Info.plist
+**/service-account*.json
+**/serviceAccount*.json
+**/*adminsdk*.json
+.firebase/
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Secrets et fichiers privés
+.env
+.env.*
+!.env.example
+*credentials*.json
+*secrets*.json
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.xlsx
+*.bak
+*.backup
+
+# Node / outils
+node_modules/
+.npm/
+.DS_Store
+Thumbs.db

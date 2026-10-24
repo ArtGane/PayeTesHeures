@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // PROD : les comptes, les rôles, les teamId et les équipes sont définis
+    // exclusivement par l'administrateur dans Firebase Console / Admin SDK.
+    function signed() { return request.auth != null; }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function teamPath(team) { return /databases/$(database)/documents/teams/$(team); }
+    function shiftPath(sid) { return /databases/$(database)/documents/shifts/$(sid); }
+    function eventPath(sid, eid) { return /databases/$(database)/documents/shifts/$(sid)/events/$(eid); }
+    function correctionPath(sid, cid) { return /databases/$(database)/documents/shifts/$(sid)/corrections/$(cid); }
+    function enrolled() {
+      return signed() && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.role in ['employee', 'manager']
+        && get(userPath(request.auth.uid)).data.teamId is string;
+    }
+    function myTeam() { return get(userPath(request.auth.uid)).data.teamId; }
+    // team.managerUid relie explicitement chaque équipe à son responsable de lecture.
+    function isManager() {
+      return enrolled()
+        && get(userPath(request.auth.uid)).data.role == 'manager'
+        && exists(teamPath(myTeam()))
+        && get(teamPath(myTeam())).data.managerUid == request.auth.uid;
+    }
+    function own(uid) { return enrolled() && uid == request.auth.uid; }
+    function teamManager(teamId) { return isManager() && teamId == myTeam(); }
+    function linkedEvent(sid, eid) { return getAfter(eventPath(sid, eid)).data; }
+    function linkedCorrection(sid, cid) { return getAfter(correctionPath(sid, cid)).data; }
+
+    match /teams/{tid} {
+      allow get: if enrolled() && tid == myTeam();
+      allow list, create, update, delete: if false;
+    }
+
+    match /users/{uid} {
+      // Le manager ne peut lire QUE les profils de son équipe.
+      // Les requêtes liste du manager DOIVENT filtrer par teamId.
+      allow get, list: if own(uid) || (teamManager(resource.data.teamId));
+      allow create, update, delete: if false;
+    }
+
+    match /shifts/{sid} {
+      // Chaque personne voit ses services ; un manager peut lire ceux de son équipe.
+      // Pour les listes manager, requête où teamId == myTeam().
+      allow get, list: if own(resource.data.uid) || teamManager(resource.data.teamId);
+
+      allow create: if enrolled()
+        && request.resource.data.keys().hasOnly(['uid', 'teamId', 'createdAt', 'state', 'lastEventId'])
+        && request.resource.data.keys().hasAll(['uid', 'teamId', 'createdAt', 'state', 'lastEventId'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.teamId == myTeam()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.state == 'WORKING'
+        && request.resource.data.lastEventId is string
+        && linkedEvent(sid, request.resource.data.lastEventId).uid == request.auth.uid
+        && linkedEvent(sid, request.resource.data.lastEventId).type == 'ARRIVAL'
+        && linkedEvent(sid, request.resource.data.lastEventId).at == request.time;
+
+      function validTransition() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        let eid = request.resource.data.lastEventId;
+        let from = resource.data.state;
+        let to = request.resource.data.state;
+        let event = linkedEvent(sid, eid);
+        return changed.hasOnly(['state', 'lastEventId', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && eid is string && eid != resource.data.lastEventId
+          && event.uid == request.auth.uid
+          && event.at == request.time
+          && (
+            (from == 'WORKING' && to == 'BREAK' && event.type == 'BREAK_START') ||
+            (from == 'BREAK' && to == 'WORKING' && event.type == 'BREAK_END') ||
+            (from == 'WORKING' && to == 'CLOSED' && event.type == 'DEPARTURE')
+          );
+      }
+
+      function validCorrection() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        let cid = request.resource.data.lastCorrectionId;
+        let audit = linkedCorrection(sid, cid);
+        let a = request.resource.data.correctedStartAt;
+        let b = request.resource.data.correctedEndAt;
+        let m = request.resource.data.correctedBreakMinutes;
+
+        return resource.data.state == 'CLOSED'
+          && changed.hasOnly(['correctedStartAt', 'correctedEndAt',
+              'correctedBreakMinutes', 'correctionReason', 'lastCorrectionId', 'updatedAt'])
+          && request.resource.data.keys().hasAll(['correctedStartAt', 'correctedEndAt',
+              'correctedBreakMinutes', 'correctionReason', 'lastCorrectionId', 'updatedAt'])
+          && a is timestamp && b is timestamp && b > a
+          && m is int && m >= 0 && m <= 10080
+          && b - a >= duration.value(m, 'm')
+          && request.resource.data.correctionReason is string
+          && request.resource.data.correctionReason.size() >= 4
+          && request.resource.data.correctionReason.size() <= 300
+          && cid is string && cid != resource.data.get('lastCorrectionId', '')
+          && request.resource.data.updatedAt == request.time
+          && audit.uid == request.auth.uid && audit.at == request.time
+          && audit.startAt == a && audit.endAt == b
+          && audit.breakMinutes == m && audit.reason == request.resource.data.correctionReason;
+      }
+
+      allow update: if own(resource.data.uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.get('teamId', '') == resource.data.get('teamId', '')
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (validTransition() || validCorrection());
+      allow delete: if false;
+
+      match /events/{eid} {
+        allow get, list: if own(get(shiftPath(sid)).data.uid)
+          || teamManager(get(shiftPath(sid)).data.teamId);
+
+        function geoValid() {
+          return request.resource.data.keys().hasAll(['lat', 'lng', 'accuracyMeters'])
+            && request.resource.data.lat is number && request.resource.data.lng is number
+            && request.resource.data.accuracyMeters is number
+            && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+            && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+            && request.resource.data.accuracyMeters >= 0 && request.resource.data.accuracyMeters <= 100;
+        }
+        function noGeo() { return !request.resource.data.keys().hasAny(['lat', 'lng', 'accuracyMeters']); }
+
+        allow create: if enrolled()
+          && request.resource.data.keys().hasOnly(['uid', 'type', 'at', 'lat', 'lng', 'accuracyMeters'])
+          && request.resource.data.keys().hasAll(['uid', 'type', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.at == request.time
+          && getAfter(shiftPath(sid)).data.uid == request.auth.uid
+          && getAfter(shiftPath(sid)).data.lastEventId == eid
+          && (
+            (request.resource.data.type == 'ARRIVAL' && getAfter(shiftPath(sid)).data.state == 'WORKING' && geoValid()) ||
+            (request.resource.data.type == 'DEPARTURE' && getAfter(shiftPath(sid)).data.state == 'CLOSED' && geoValid()) ||
+            (request.resource.data.type == 'BREAK_START' && getAfter(shiftPath(sid)).data.state == 'BREAK' && noGeo()) ||
+            (request.resource.data.type == 'BREAK_END' && getAfter(shiftPath(sid)).data.state == 'WORKING' && noGeo())
+          );
+        allow update, delete: if false;
+      }
+
+      match /corrections/{cid} {
+        allow get, list: if own(get(shiftPath(sid)).data.uid)
+          || teamManager(get(shiftPath(sid)).data.teamId);
+        allow create: if own(getAfter(shiftPath(sid)).data.uid)
+          && request.resource.data.keys().hasOnly(['uid', 'at', 'startAt', 'endAt', 'breakMinutes', 'reason'])
+          && request.resource.data.keys().hasAll(['uid', 'at', 'startAt', 'endAt', 'breakMinutes', 'reason'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.at == request.time
+          && getAfter(shiftPath(sid)).data.lastCorrectionId == cid
+          && getAfter(shiftPath(sid)).data.correctedStartAt == request.resource.data.startAt
+          && getAfter(shiftPath(sid)).data.correctedEndAt == request.resource.data.endAt
+          && getAfter(shiftPath(sid)).data.correctedBreakMinutes == request.resource.data.breakMinutes
+          && getAfter(shiftPath(sid)).data.correctionReason == request.resource.data.reason
+          && getAfter(shiftPath(sid)).data.updatedAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
