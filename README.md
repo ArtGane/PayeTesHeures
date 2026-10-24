@@ -11,12 +11,10 @@
 ## ✨ Fonctionnalités
 
 - **Pointage GPS** à l’arrivée et au départ, avec affichage de la **ville** dans l’interface.
-- **Pauses déduites** du temps de présence : 10 h de présence − 1 h 30 de pause = **8 h 30 nettes**.
 - **Bilans par semaine et par mois**, consultation de l’historique et correction des horaires avec justification.
 - **Équipes distinctes** : un responsable consulte son équipe en lecture seule, sans modifier les heures des autres.
 - **Managers pointants** : un responsable peut également pointer et corriger **ses propres** horaires.
 - **Planning matin / après-midi** par téléphone et **notifications de rappel** (non garanties à la minute).
-- **Interface sombre et adaptative** : téléphones compacts, grands écrans et tablettes.
 - **Historique** : événements GPS originaux et journal de correction prévus pour être non modifiables côté client.
 
 ## 🛠️ Stack technique
@@ -36,9 +34,9 @@
 
 1. Cloner ou télécharger le dépôt, puis ouvrir le dossier contenant `settings.gradle.kts` dans Android Studio.
 2. Dans la [Firebase Console](https://console.firebase.google.com/), enregistrer une application Android avec l’identifiant **`fr.payetesheures.app`** (ou adapter `applicationId` dans `app/build.gradle.kts`).
-3. Télécharger **votre propre** fichier `google-services.json` et le déposer **localement** dans `app/google-services.json`. **Ne pas le publier dans le dépôt.**
+3. Télécharger votre fichier `google-services.json` et le déposer dans `app/google-services.json`. **Ne pas le publier dans le dépôt.**
 4. Activer la connexion **E-mail / mot de passe** dans Authentication et créer une base Firestore.
-5. Configurer les documents de test `teams`, `users` et les règles de sécurité. Lire **[MIGRATION-FIREBASE.md](MIGRATION-FIREBASE.md)** avant toute migration d’anciens pointages.
+5. Configurer les documents de test `teams`, `users` et les règles de sécurité.
 6. Vérifier la configuration Gradle. Si le Wrapper est absent, le script `PREPARER-WINDOWS.cmd` permet de récupérer le Wrapper officiel sous Windows ; examiner tout script avant exécution.
 7. Synchroniser Gradle, compiler et exécuter sur un émulateur ou un téléphone Android. Pour générer un APK de test : **Build → Build APK(s)**.
 
