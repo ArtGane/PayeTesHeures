@@ -42,53 +42,24 @@
 
 > **Ne publiez pas `google-services.json`, vos clés de service Firebase Admin, vos clés de signature ni des exports de pointages réels.**
 
-## 🔐 Schéma Firestore (exemple fictif)
 
-```text
-teams/equipe_demo
-  name: "Équipe démo"
-  managerUid: "UID_MANAGER_DEMO"
+## 📱 Télécharger PayeTesheures sur Android 
 
-users/UID_MANAGER_DEMO
-  name: "Camille"
-  role: "manager"
-  teamId: "equipe_demo"
+Téléchargez gratuitement l'application Android,
+sans passer par le Google Play Store.
 
-users/UID_EMPLOYE_DEMO
-  name: "Alex"
-  role: "employee"
-  teamId: "equipe_demo"
+[⬇️ Télécharger PayeTesheures (APK)](https://github.com/VOTRE_PSEUDO/PayeTesheures/releases/latest/download/PayeTesheures.apk)
 
-shifts/ID_DU_SERVICE
-  uid: "UID_EMPLOYE_DEMO"
-  teamId: "equipe_demo"
-  ...
+**Installation :** téléchargez l'APK sur votre téléphone
+Android, ouvrez-le et autorisez l'installation depuis
+cette source si Android le demande.
 
-shifts/ID_DU_SERVICE/events/{eventId}       # pointages GPS
-shifts/ID_DU_SERVICE/corrections/{id}       # corrections d’horaires
-```
-
-Les règles versionnées dans **[`firestore.rules`](firestore.rules)** doivent être **déployées séparément** dans la bonne base Firebase. Elles ne sont pas installées automatiquement par l’APK. Testez systématiquement un salarié, un manager de son équipe et un manager d’une autre équipe dans l’émulateur Firestore ou avec des comptes de démonstration.
-
-## 🗂️ Repères dans le code
-
-```text
-app/src/main/java/fr/payetesheures/app/
-  data/       → pointages, modèles, géolocalisation, calculs
-  reminders/  → planning local et rappels
-  ui/         → écrans Compose, navigation, thème et composants adaptatifs
-firestore.rules       → règles de lecture/écriture Firestore
-MIGRATION-FIREBASE.md → documentation de migration des équipes
-scripts/              → utilitaire administratif de migration (simulation par défaut)
-```
 
 ## 🧪 Tests et limites
 
-- Tests des calculs dans `tests-models/` (hors Android). **Compilation et tests complets sur Android / Firebase à effectuer dans votre environnement.**
 - Les horaires et jours de travail sont **stockés localement sur chaque téléphone** ; les notifications peuvent être retardées ou désactivées.
 - Les données GPS originales sont protégées contre la modification par les utilisateurs ordinaires via les règles prévues, **mais une position fournie par un téléphone n’est pas une preuve infalsifiable**.
 - Un service chevauchant minuit est comptabilisé dans la période de sa date de début dans cette version.
-- Pour un usage réel : réaliser une revue des règles, organiser les sauvegardes, documenter la durée de conservation, informer les salariés et vérifier les exigences RGPD / droit du travail applicables.
 
 ## ⚖️ Licence MIT et réutilisation
 
